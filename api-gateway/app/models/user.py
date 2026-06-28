@@ -16,6 +16,8 @@ class UserRole(str, enum.Enum):
 
 
 class User(Base):
+    """Application user account."""
+
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(
