@@ -1,0 +1,51 @@
+name: Reusable Release
+
+on:
+  workflow_call:
+    inputs:
+      app_name:
+        description: 'Microservice name'
+        required: true
+        type: string
+      pr_title:
+        description: 'Title of merged PR'
+        required: true
+        type: string
+      pr_body:
+        description: 'Body of merged PR'
+        required: false
+        type: string
+
+jobs:
+  create-release:
+    name: Generate Tag and GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download the repository code
+        uses: actions/checkout@v4
+
+      - name: Generate Tag Name
+        id: generate-tag
+        run: |
+          SHORT_SHA=${GITHUB_SHA::7}
+          DATE=$(date +'%Y.%m.%d')
+          TAG_NAME="${{ inputs.app_name }}-${DATE}-${SHORT_SHA}"
+
+          echo "Generated tag: $TAG_NAME"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.generate-tag.outputs.tag_name }}
+          name: ${{ inputs.app_name }} Release ${{ steps.generate-tag.outputs.tag_name }}
+          body: |
+            ### Changes in this release:
+            **PR:** ${{ inputs.pr_title }}
+
+            ${{ inputs.pr_body }}
+          draft: false
+          prerelease: false
