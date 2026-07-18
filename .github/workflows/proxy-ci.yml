@@ -43,9 +43,9 @@ jobs:
 
       - name: Step 2 - Code Quality (Linters and Formatters)
         run: |
-          pip install black flake8
-          black --check app/ tests/
-          flake8 app/ tests/
+          pip install ruff
+          ruff check app/ tests/
+          ruff format --check app/ tests/
 
       - name: Step 3 - Unit Tests
         run: pytest

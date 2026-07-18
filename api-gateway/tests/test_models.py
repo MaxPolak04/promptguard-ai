@@ -49,9 +49,7 @@ async def test_user_defaults(session: AsyncSession):
     session.add(user)
     await session.commit()
 
-    result = await session.execute(
-        select(User).where(User.email == "bob@example.com")
-    )
+    result = await session.execute(select(User).where(User.email == "bob@example.com"))
     fetched = result.scalar_one()
     assert fetched.role == UserRole.chat_user
     assert fetched.is_active is True
@@ -59,9 +57,19 @@ async def test_user_defaults(session: AsyncSession):
 
 
 async def test_email_must_be_unique(session: AsyncSession):
-    session.add(User(email="dup@example.com", hashed_password="h1"))
+    session.add(
+        User(
+            email="dup@example.com",
+            hashed_password="h1",  # pragma: allowlist secret
+        )
+    )
     await session.commit()
 
-    session.add(User(email="dup@example.com", hashed_password="h2"))
+    session.add(
+        User(
+            email="dup@example.com",
+            hashed_password="h2",  # pragma: allowlist secret
+        )
+    )
     with pytest.raises(IntegrityError):
         await session.commit()
