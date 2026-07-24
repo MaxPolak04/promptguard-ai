@@ -1,0 +1,11 @@
+{
+  "name": "frontend-ciso",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "echo 'Mock Dev Server'",
+    "build": "mkdir -p dist && echo '<html>Mock Chat</html>' > dist/index.html",
+    "lint": "echo 'Mock Lint Passed'",
+    "format": "echo 'Mock Format Passed'",
+    "test": "echo 'Mock Test Passed'"
+  }
+}
