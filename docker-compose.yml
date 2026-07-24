@@ -24,32 +24,10 @@ services:
     build:
       context: ./frontend-chat
       dockerfile: Dockerfile
-      target: builder
+      target: dev
     container_name: promptguard_chat
-    command: npm run dev
     volumes:
       - ./frontend-chat:/app
-      - /app/node_modules
-    networks:
-      - frontend_net
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    restart: always
-
-  ciso:
-    build:
-      context: ./frontend-ciso
-      dockerfile: Dockerfile
-      target: builder
-    container_name: promptguard_ciso
-    command: npm run dev
-    volumes:
-      - ./frontend-ciso:/app
       - /app/node_modules
     networks:
       - frontend_net
@@ -66,10 +44,8 @@ services:
     build:
       context: ./api-gateway
       dockerfile: Dockerfile
-      target: builder
+      target: dev
     container_name: promptguard_api
-    working_dir: /app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./api-gateway:/app
     env_file:
