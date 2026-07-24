@@ -73,6 +73,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Step 6 - Build & Push
+        working-directory: ./ml-classifier
         run: |
           IMAGE_BASE=ghcr.io/${{ github.repository_owner }}/ml-classifier
           IMAGE_BASE=$(echo $IMAGE_BASE | tr '[A-Z]' '[a-z]')
