@@ -24,28 +24,10 @@ services:
     build:
       context: ./frontend-chat
       dockerfile: Dockerfile
+      target: dev
     container_name: promptguard_chat
     volumes:
       - ./frontend-chat:/app
-      - /app/node_modules
-    networks:
-      - frontend_net
-    security_opt:
-      - no-new-privileges:true
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    restart: always
-
-  ciso:
-    build:
-      context: ./frontend-ciso
-      dockerfile: Dockerfile
-    container_name: promptguard_ciso
-    volumes:
-      - ./frontend-ciso:/app
       - /app/node_modules
     networks:
       - frontend_net
@@ -62,7 +44,10 @@ services:
     build:
       context: ./api-gateway
       dockerfile: Dockerfile
+      target: dev
     container_name: promptguard_api
+    volumes:
+      - ./api-gateway:/app
     env_file:
       - .env
     environment:
@@ -87,7 +72,12 @@ services:
     build:
       context: ./ml-classifier
       dockerfile: Dockerfile
+      target: builder
     container_name: promptguard_ml
+    working_dir: /app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 7000 --reload
+    volumes:
+      - ./ml-classifier:/app
     networks:
       - backend_net
     security_opt:
@@ -144,7 +134,7 @@ services:
     restart: always
 
   monitoring:
-    image: prom/prometheus:3.13-debian-fips
+    image: prom/prometheus:v2.53.0
     container_name: prometheus_monitoring
     ports:
       - '9090:9090'
