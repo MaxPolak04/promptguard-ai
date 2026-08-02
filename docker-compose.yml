@@ -40,6 +40,26 @@ services:
           memory: 256M
     restart: always
 
+  ciso:
+    build:
+      context: ./frontend-ciso
+      dockerfile: Dockerfile
+      target: dev
+    container_name: promptguard_ciso
+    volumes:
+      - ./frontend-ciso:/app
+      - /app/node_modules
+    networks:
+      - frontend_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: always
+
   api:
     build:
       context: ./api-gateway
