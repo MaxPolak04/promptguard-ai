@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models import User
-from app.schemas import RegisterRequest, UserRead
-from app.security import hash_password
+from app.schemas import LoginRequest, RegisterRequest, TokenResponse, UserRead
+from app.security import create_access_token, hash_password, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -25,3 +25,21 @@ async def register(
     await session.commit()
     await session.refresh(user)
     return user
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(
+    body: LoginRequest, session: AsyncSession = Depends(get_session)
+) -> TokenResponse:
+    """Verify credentials and issue a bearer token."""
+    result = await session.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+    if (
+        user is None
+        or not verify_password(body.password, user.hashed_password)
+        or not user.is_active
+    ):
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, detail="invalid credentials"
+        )
+    return TokenResponse(access_token=create_access_token(user.id, user.role.value))
