@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.db import build_engine, build_sessionmaker
 from app.llm import LLMClient
 from app.models import Base
-from app.routers import auth, health
+from app.routers import auth, chat, health
 
 _SENSITIVE_FIELDS = frozenset({"password"})
 
@@ -55,6 +55,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.include_router(health.router)
     app.include_router(auth.router)
+    app.include_router(chat.router)
     return app
 
 

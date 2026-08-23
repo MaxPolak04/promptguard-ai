@@ -35,3 +35,16 @@ class UserRead(BaseModel):
     email: EmailStr
     role: UserRole
     is_active: bool
+
+
+class ChatRequest(BaseModel):
+    """A user prompt to proxy to the LLM provider."""
+
+    prompt: str = Field(min_length=1)
+
+
+class ChatResponse(BaseModel):
+    """The (possibly blocked) reply returned to the user."""
+
+    response: str
+    blocked: bool = False
