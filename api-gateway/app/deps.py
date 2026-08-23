@@ -28,7 +28,16 @@ async def get_current_user(
         payload = decode_access_token(credentials.credentials)
     except jwt.PyJWTError:
         raise unauthorized from None
-    user = await session.get(User, uuid.UUID(payload["sub"]))
+
+    subject = payload.get("sub")
+    if not isinstance(subject, str):
+        raise unauthorized
+    try:
+        user_id = uuid.UUID(subject)
+    except ValueError:
+        raise unauthorized from None
+
+    user = await session.get(User, user_id)
     if user is None or not user.is_active:
         raise unauthorized
     return user

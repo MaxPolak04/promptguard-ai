@@ -1,5 +1,10 @@
+import uuid
+from datetime import datetime, timedelta, timezone
+
+import jwt
 from sqlalchemy import select
 
+from app.config import get_settings
 from app.models import User
 from app.security import decode_access_token
 
@@ -127,5 +132,55 @@ async def test_me_without_token_returns_401(client):
 async def test_me_with_garbage_token_returns_401(client):
     resp = await client.get(
         "/auth/me", headers={"Authorization": "Bearer not-a-jwt"}
+    )
+    assert resp.status_code == 401
+
+
+async def test_me_inactive_user_returns_401(app, client):
+    headers = await _login_headers(client, email="inactive-me@example.com")
+    maker = app.state.sessionmaker
+    async with maker() as session:
+        result = await session.execute(
+            select(User).where(User.email == "inactive-me@example.com")
+        )
+        user = result.scalar_one()
+        user.is_active = False
+        await session.commit()
+    resp = await client.get("/auth/me", headers=headers)
+    assert resp.status_code == 401
+
+
+def _raw_token(payload: dict) -> str:
+    """Sign an arbitrary payload with the app's real settings, for malformed-token tests."""
+    settings = get_settings()
+    full_payload = {
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=30),
+        **payload,
+    }
+    return jwt.encode(
+        full_payload, settings.proxy_secret_key, algorithm=settings.jwt_algorithm
+    )
+
+
+async def test_me_unknown_user_returns_401(client):
+    token = _raw_token({"sub": str(uuid.uuid4()), "role": "chat_user"})
+    resp = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 401
+
+
+async def test_me_token_missing_sub_returns_401(client):
+    token = _raw_token({"role": "chat_user"})
+    resp = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert resp.status_code == 401
+
+
+async def test_me_token_with_invalid_sub_returns_401(client):
+    token = _raw_token({"sub": "not-a-uuid", "role": "chat_user"})
+    resp = await client.get(
+        "/auth/me", headers={"Authorization": f"Bearer {token}"}
     )
     assert resp.status_code == 401
