@@ -37,10 +37,10 @@ class LLMClient:
             response.raise_for_status()
         except httpx.HTTPError as exc:
             raise LLMError(str(exc)) from exc
-        data = response.json()
         try:
+            data = response.json()
             return data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError) as exc:
+        except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise LLMError("malformed provider response") from exc
 
     async def aclose(self) -> None:
