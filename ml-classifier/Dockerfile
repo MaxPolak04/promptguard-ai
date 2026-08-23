@@ -6,9 +6,12 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel>=0.46.2 jaraco.con
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Builder
+FROM base AS builder
 
 RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel>=0.46.2 jaraco.context>=6.1.0
 
@@ -18,15 +21,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Development
 FROM base AS dev
 
+COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
+
 USER appuser
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7000", "--reload"]
 
 # Production
 FROM base AS prod
 
-COPY app ./app
+COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
+COPY --chown=appuser:appuser app ./app
 
 USER appuser
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7000"]

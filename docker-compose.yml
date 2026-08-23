@@ -1,34 +1,213 @@
 services:
+  reverse_proxy:
+    image: nginxinc/nginx-unprivileged:alpine
+    container_name: promptguard_nginx
+    ports:
+      - '8080:8080'
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - frontend_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    depends_on:
+      - chat
+      - ciso
+      - api
+
+  chat:
+    build:
+      context: ./frontend-chat
+      dockerfile: Dockerfile
+      target: dev
+    container_name: promptguard_chat
+    volumes:
+      - ./frontend-chat:/app
+      - /app/node_modules
+    networks:
+      - frontend_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: always
+
+  ciso:
+    build:
+      context: ./frontend-ciso
+      dockerfile: Dockerfile
+      target: dev
+    container_name: promptguard_ciso
+    volumes:
+      - ./frontend-ciso:/app
+      - /app/node_modules
+    networks:
+      - frontend_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    restart: always
 
   api:
     build:
       context: ./api-gateway
       dockerfile: Dockerfile
+      target: dev
     container_name: promptguard_api
-    ports:
-      - "8000:8000"
+    volumes:
+      - ./api-gateway:/app
     env_file:
       - .env
     environment:
+      # The gateway's Settings builds its own async DSN from these components,
+      # so DB_* is mapped here rather than passed as a single DATABASE_URL.
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
+    networks:
+      - frontend_net
+      - backend_net
+      - data_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
     depends_on:
       db:
         condition: service_healthy
     restart: always
 
+  ml:
+    build:
+      context: ./ml-classifier
+      dockerfile: Dockerfile
+      target: builder
+    container_name: promptguard_ml
+    working_dir: /app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 7000 --reload
+    volumes:
+      - ./ml-classifier:/app
+    networks:
+      - backend_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+    restart: always
+
   db:
     image: postgres:15-alpine
     container_name: postgres_db
-    env_file:
-      - .env
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
+    networks:
+      - data_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 5s
       retries: 5
 
+  db_exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres_exporter
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=disable
+    networks:
+      - data_net
+      - telemetry_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+
+  monitoring:
+    image: prom/prometheus:v2.53.0
+    container_name: prometheus_monitoring
+    ports:
+      - '9090:9090'
+    volumes:
+      - monitoring_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - backend_net
+      - telemetry_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  metrics:
+    image: grafana/grafana:10.4.2
+    container_name: grafana_metrics
+    user: '472:472'
+    ports:
+      - '3000:3000'
+    volumes:
+      - metrics_data:/var/lib/grafana
+    networks:
+      - telemetry_net
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
 volumes:
-  postgres_data:
+  db_data:
+  monitoring_data:
+  metrics_data:
+
+networks:
+  frontend_net:
+    driver: bridge
+  backend_net:
+    driver: bridge
+  data_net:
+    driver: bridge
+    internal: true
+  telemetry_net:
+    driver: bridge

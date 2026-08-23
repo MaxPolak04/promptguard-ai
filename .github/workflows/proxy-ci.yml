@@ -2,6 +2,7 @@ name: Proxy Gateway CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     branches:
       - main
     paths:
@@ -10,7 +11,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+  packages: write
+  security-events: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,7 +21,7 @@ concurrency:
 
 jobs:
   test:
-    name: Lint and Test
+    name: Build, Test and Analyze
     runs-on: ubuntu-latest
 
     defaults:
@@ -38,19 +41,37 @@ jobs:
             ./api-gateway/requirements.txt
             ./api-gateway/requirements-dev.txt
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt -r requirements-dev.txt ruff==0.3.0
+      - name: Step 1 - Installing Dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Lint (ruff)
+      - name: Step 2 - Code Quality (Linters and Formatters)
         run: |
-          ruff check .
-          ruff format --check .
+          ruff check app/ tests/
+          ruff format --check app/ tests/
 
-      - name: Unit tests (pytest)
-        run: pytest -v
+      - name: Step 3 - Unit Tests
+        run: pytest
 
-  build:
-    name: Build Docker Image
+      - name: Step 4 - DevSecOps Security (SAST)
+        run: |
+          pip install bandit
+          bandit -r app/
+
+      - name: Step 5 - Secret Detection
+        run: |
+          pip install detect-secrets
+          detect-secrets scan > secrets-report.json
+          if [ "$(jq '.results | length' secrets-report.json)" -gt 0 ]; then
+            echo "❌ CRITICAL: Potential secrets have been detected in the Python code!"
+            cat secrets-report.json
+            exit 1
+          else
+            echo "✅ Scan complete. No leaks detected."
+          fi
+
+
+  build-and-scan:
+    name: Build and Scan Docker Image
     needs: test
     runs-on: ubuntu-latest
 
@@ -58,5 +79,47 @@ jobs:
       - name: Download the repository code
         uses: actions/checkout@v4
 
-      - name: Build image
-        run: docker build -t promptguard-api:${{ github.sha }} ./api-gateway
+      - name: Build Local Image for Security Audit
+        working-directory: ./api-gateway
+        run: |
+          docker build -t promptguard-api:test .
+
+      - name: Step 6 - Trivy Vulnerability Scanner (Container Security)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'promptguard-api:test'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+
+      - name: Step 7 - Logging in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Step 8 - Push Verified Image to GHCR
+        working-directory: ./api-gateway
+        run: |
+          IMAGE_BASE=ghcr.io/${{ github.repository_owner }}/promptguard-api
+          IMAGE_BASE=$(echo $IMAGE_BASE | tr '[A-Z]' '[a-z]')
+          SHORT_SHA=${GITHUB_SHA::7}
+
+          docker tag promptguard-api:test $IMAGE_BASE:latest
+          docker tag promptguard-api:test $IMAGE_BASE:$SHORT_SHA
+
+          docker push $IMAGE_BASE:latest
+          docker push $IMAGE_BASE:$SHORT_SHA
+
+
+  release:
+    name: Trigger Release
+    needs: build-and-scan
+    if: github.event.pull_request.merged == true
+    uses: ./.github/workflows/reusable-release.yml
+    with:
+      app_name: 'api-gateway'
+      pr_title: ${{ github.event.pull_request.title }}
+      pr_body: ${{ github.event.pull_request.body }}
