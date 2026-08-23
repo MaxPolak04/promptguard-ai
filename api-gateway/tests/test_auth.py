@@ -31,6 +31,29 @@ async def test_register_duplicate_email_returns_409(client):
     assert second.status_code == 409
 
 
+async def test_register_duplicate_email_different_case_returns_409(client):
+    first = await client.post(
+        "/auth/register",
+        json={"email": "alice@example.com", "password": "secret123"},
+    )
+    assert first.status_code == 201
+    second = await client.post(
+        "/auth/register",
+        json={"email": "Alice@Example.com", "password": "secret123"},
+    )
+    assert second.status_code == 409
+
+
+async def test_login_succeeds_with_different_case_than_registration(client):
+    await _register(client, email="casing@example.com")
+    resp = await client.post(
+        "/auth/login",
+        json={"email": "Casing@Example.com", "password": "secret123"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["token_type"] == "bearer"
+
+
 async def test_register_rejects_short_password(client):
     resp = await client.post(
         "/auth/register",
@@ -38,16 +61,26 @@ async def test_register_rejects_short_password(client):
     )
     assert resp.status_code == 422
     assert "pw123" not in resp.text
-    assert "[redacted]" in resp.text
+    assert all("input" not in error for error in resp.json()["detail"])
 
 
-async def test_register_invalid_email_keeps_input_visible(client):
+async def test_register_invalid_email_redacts_input(client):
     resp = await client.post(
         "/auth/register",
         json={"email": "not-an-email", "password": "secret123"},
     )
     assert resp.status_code == 422
-    assert "not-an-email" in resp.text
+    assert "not-an-email" not in resp.text
+    assert all("input" not in error for error in resp.json()["detail"])
+
+
+async def test_register_array_body_does_not_leak_password(client):
+    resp = await client.post(
+        "/auth/register",
+        json=["not-an-object@example.com", "hunter2-super-secret"],
+    )
+    assert resp.status_code == 422
+    assert "hunter2-super-secret" not in resp.text
 
 
 async def _register(client, email="login@example.com", password="secret123"):
@@ -79,6 +112,7 @@ async def test_login_wrong_password_returns_401(client):
         json={"email": "login@example.com", "password": "wrong-password"},
     )
     assert resp.status_code == 401
+    assert resp.json()["detail"] == "invalid credentials"
 
 
 async def test_login_unknown_email_returns_401(client):
@@ -87,6 +121,7 @@ async def test_login_unknown_email_returns_401(client):
         json={"email": "ghost@example.com", "password": "secret123"},
     )
     assert resp.status_code == 401
+    assert resp.json()["detail"] == "invalid credentials"
 
 
 async def test_login_inactive_user_returns_401(app, client):
@@ -104,6 +139,7 @@ async def test_login_inactive_user_returns_401(app, client):
         json={"email": "inactive@example.com", "password": "secret123"},
     )
     assert resp.status_code == 401
+    assert resp.json()["detail"] == "invalid credentials"
 
 
 async def _login_headers(client, email="me@example.com", password="secret123"):

@@ -3,6 +3,7 @@ import uuid
 import jwt
 import pytest
 
+from app.config import get_settings
 from app.security import (
     create_access_token,
     decode_access_token,
@@ -31,3 +32,25 @@ def test_tampered_token_is_rejected():
     token = create_access_token(uuid.uuid4(), "chat_user")
     with pytest.raises(jwt.PyJWTError):
         decode_access_token(token + "x")
+
+
+def test_token_without_exp_is_rejected():
+    settings = get_settings()
+    token = jwt.encode(
+        {"sub": str(uuid.uuid4()), "role": "chat_user"},
+        settings.proxy_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+    with pytest.raises(jwt.PyJWTError):
+        decode_access_token(token)
+
+
+def test_token_without_sub_is_rejected():
+    settings = get_settings()
+    token = jwt.encode(
+        {"role": "chat_user"},
+        settings.proxy_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+    with pytest.raises(jwt.PyJWTError):
+        decode_access_token(token)

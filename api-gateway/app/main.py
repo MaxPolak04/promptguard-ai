@@ -41,10 +41,18 @@ async def lifespan(app: FastAPI):
 async def validation_error_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    """Return validation errors with submitted secrets redacted."""
+    """Return validation errors with submitted secrets redacted.
+
+    Auth routes drop `input` from every error outright: a non-object body
+    (e.g. a JSON array) collapses `loc` to just ["body"], so the field-name
+    check below would otherwise echo the whole payload, password included.
+    """
+    redact_all_input = request.url.path.startswith("/auth")
     errors = []
     for error in exc.errors():
-        if _SENSITIVE_FIELDS.intersection(str(part) for part in error.get("loc", ())):
+        if redact_all_input:
+            error = {k: v for k, v in error.items() if k != "input"}
+        elif _SENSITIVE_FIELDS.intersection(str(part) for part in error.get("loc", ())):
             error = {**error, "input": "[redacted]"}
         errors.append(error)
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})

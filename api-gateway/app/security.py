@@ -35,5 +35,8 @@ def decode_access_token(token: str) -> dict:
     """Decode and validate a JWT. Raises jwt.PyJWTError when invalid or expired."""
     settings = get_settings()
     return jwt.decode(
-        token, settings.proxy_secret_key, algorithms=[settings.jwt_algorithm]
+        token,
+        settings.proxy_secret_key,
+        algorithms=[settings.jwt_algorithm],
+        options={"require": ["exp", "sub"]},
     )
