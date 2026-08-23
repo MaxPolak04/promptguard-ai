@@ -99,3 +99,33 @@ async def test_login_inactive_user_returns_401(app, client):
         json={"email": "inactive@example.com", "password": "secret123"},
     )
     assert resp.status_code == 401
+
+
+async def _login_headers(client, email="me@example.com", password="secret123"):
+    await _register(client, email=email, password=password)
+    resp = await client.post(
+        "/auth/login", json={"email": email, "password": password}
+    )
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def test_me_returns_current_user(client):
+    headers = await _login_headers(client)
+    resp = await client.get("/auth/me", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["email"] == "me@example.com"
+    assert data["role"] == "chat_user"
+
+
+async def test_me_without_token_returns_401(client):
+    resp = await client.get("/auth/me")
+    assert resp.status_code == 401
+
+
+async def test_me_with_garbage_token_returns_401(client):
+    resp = await client.get(
+        "/auth/me", headers={"Authorization": "Bearer not-a-jwt"}
+    )
+    assert resp.status_code == 401
