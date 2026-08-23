@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     postgres_db: str
 
+    proxy_secret_key: str
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+
     @property
     def database_url(self) -> str:
         """Async SQLAlchemy connection URL (asyncpg driver)."""
