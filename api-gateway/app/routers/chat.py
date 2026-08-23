@@ -51,15 +51,14 @@ async def chat(
         )
         raise HTTPException(
             status.HTTP_403_FORBIDDEN,
-            detail=f"prompt blocked by rule: {prompt_match.rule}",
+            detail="prompt blocked by content policy",
         )
 
     try:
         reply = await llm.complete(body.prompt)
     except LLMError as exc:
-        # The prompt may already have reached the provider (e.g. a malformed
-        # reply, as opposed to a connect/DNS failure), so it still gets an
-        # audit row even though no usable response came back.
+        # The prompt may have reached the provider even though no usable
+        # response came back, so the attempt is audited either way.
         await _audit(session, user, AuditAction.allowed, body.prompt)
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, detail="LLM provider unavailable"

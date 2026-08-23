@@ -5,6 +5,8 @@ from sqlalchemy import select
 from app.llm import LLMClient
 from app.models import AuditAction, AuditEvent
 
+_FAKE_AWS_KEY = "AKIAIOSFODNN7EXAMPLE"  # pragma: allowlist secret
+
 
 @pytest_asyncio.fixture
 async def auth_headers(client):
@@ -49,6 +51,15 @@ async def test_chat_rejects_empty_prompt(app, client, auth_headers):
     assert len(events) == 0
 
 
+async def test_chat_rejects_oversized_prompt(app, client, auth_headers):
+    resp = await client.post(
+        "/chat", json={"prompt": "a" * 32001}, headers=auth_headers
+    )
+    assert resp.status_code == 422
+    events = await _audit_events(app)
+    assert len(events) == 0
+
+
 async def test_chat_returns_llm_reply_and_audits(app, client, auth_headers):
     resp = await client.post("/chat", json={"prompt": "hello"}, headers=auth_headers)
     assert resp.status_code == 200
@@ -63,10 +74,11 @@ async def test_chat_returns_llm_reply_and_audits(app, client, auth_headers):
 async def test_chat_blocks_prompt_with_secret(app, client, auth_headers):
     resp = await client.post(
         "/chat",
-        json={"prompt": "use AKIAIOSFODNN7EXAMPLE please"},  # pragma: allowlist secret
+        json={"prompt": f"use {_FAKE_AWS_KEY} please"},
         headers=auth_headers,
     )
     assert resp.status_code == 403
+    assert "aws_access_key" not in resp.text
     events = await _audit_events(app)
     assert len(events) == 1
     assert events[0].action == AuditAction.blocked_prompt
@@ -77,13 +89,7 @@ async def test_chat_blocks_leaky_response(app, client, auth_headers):
     def leaky(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
-            json={
-                "choices": [
-                    {
-                        "message": {"content": "sure: AKIAIOSFODNN7EXAMPLE"}
-                    }  # pragma: allowlist secret
-                ]
-            },
+            json={"choices": [{"message": {"content": f"sure: {_FAKE_AWS_KEY}"}}]},
         )
 
     _override_llm(app, leaky)
@@ -96,9 +102,7 @@ async def test_chat_blocks_leaky_response(app, client, auth_headers):
     assert len(events) == 1
     assert events[0].action == AuditAction.blocked_response
     assert events[0].rule == "aws_access_key"
-    assert (
-        events[0].response == "sure: AKIAIOSFODNN7EXAMPLE"
-    )  # pragma: allowlist secret
+    assert events[0].response == f"sure: {_FAKE_AWS_KEY}"
 
 
 async def test_chat_returns_502_when_provider_down(app, client, auth_headers):
