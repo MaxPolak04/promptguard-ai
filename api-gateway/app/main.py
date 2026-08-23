@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from app.config import get_settings
 from app.db import build_engine, build_sessionmaker
 from app.models import Base
-from app.routers import health
+from app.routers import auth, health
 
 
 @asynccontextmanager
@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(title="PromptGuard API Gateway", lifespan=lifespan)
     app.include_router(health.router)
+    app.include_router(auth.router)
     return app
 
 
