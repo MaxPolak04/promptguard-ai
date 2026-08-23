@@ -26,6 +26,16 @@ async def test_complete_returns_message_text():
     await client.aclose()
 
 
+async def test_transport_error_raises_llm_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("connection refused")
+
+    client = _client(handler)
+    with pytest.raises(LLMError):
+        await client.complete("hello")
+    await client.aclose()
+
+
 async def test_http_error_raises_llm_error():
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500, json={"error": "boom"})
