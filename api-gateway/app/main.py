@@ -1,11 +1,16 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.db import build_engine, build_sessionmaker
 from app.models import Base
 from app.routers import auth, health
+
+_SENSITIVE_FIELDS = frozenset({"password"})
 
 
 @asynccontextmanager
@@ -23,8 +28,21 @@ async def lifespan(app: FastAPI):
         await engine.dispose()
 
 
+async def validation_error_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Return validation errors with submitted secrets redacted."""
+    errors = []
+    for error in exc.errors():
+        if _SENSITIVE_FIELDS.intersection(str(part) for part in error.get("loc", ())):
+            error = {**error, "input": "[redacted]"}
+        errors.append(error)
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="PromptGuard API Gateway", lifespan=lifespan)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.include_router(health.router)
     app.include_router(auth.router)
     return app

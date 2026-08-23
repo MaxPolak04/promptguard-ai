@@ -23,6 +23,17 @@ async def test_register_duplicate_email_returns_409(client):
 async def test_register_rejects_short_password(client):
     resp = await client.post(
         "/auth/register",
-        json={"email": "short@example.com", "password": "short"},
+        json={"email": "short@example.com", "password": "pw123"},
     )
     assert resp.status_code == 422
+    assert "pw123" not in resp.text
+    assert "[redacted]" in resp.text
+
+
+async def test_register_invalid_email_keeps_input_visible(client):
+    resp = await client.post(
+        "/auth/register",
+        json={"email": "not-an-email", "password": "secret123"},
+    )
+    assert resp.status_code == 422
+    assert "not-an-email" in resp.text
