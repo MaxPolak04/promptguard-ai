@@ -108,9 +108,7 @@ async def test_login_inactive_user_returns_401(app, client):
 
 async def _login_headers(client, email="me@example.com", password="secret123"):
     await _register(client, email=email, password=password)
-    resp = await client.post(
-        "/auth/login", json={"email": email, "password": password}
-    )
+    resp = await client.post("/auth/login", json={"email": email, "password": password})
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -130,9 +128,7 @@ async def test_me_without_token_returns_401(client):
 
 
 async def test_me_with_garbage_token_returns_401(client):
-    resp = await client.get(
-        "/auth/me", headers={"Authorization": "Bearer not-a-jwt"}
-    )
+    resp = await client.get("/auth/me", headers={"Authorization": "Bearer not-a-jwt"})
     assert resp.status_code == 401
 
 
@@ -164,23 +160,17 @@ def _raw_token(payload: dict) -> str:
 
 async def test_me_unknown_user_returns_401(client):
     token = _raw_token({"sub": str(uuid.uuid4()), "role": "chat_user"})
-    resp = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401
 
 
 async def test_me_token_missing_sub_returns_401(client):
     token = _raw_token({"role": "chat_user"})
-    resp = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401
 
 
 async def test_me_token_with_invalid_sub_returns_401(client):
     token = _raw_token({"sub": "not-a-uuid", "role": "chat_user"})
-    resp = await client.get(
-        "/auth/me", headers={"Authorization": f"Bearer {token}"}
-    )
+    resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 401

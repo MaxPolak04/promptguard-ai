@@ -18,9 +18,7 @@ async def register(
     """Create a new account with the default chat_user role."""
     result = await session.execute(select(User).where(User.email == body.email))
     if result.scalar_one_or_none() is not None:
-        raise HTTPException(
-            status.HTTP_409_CONFLICT, detail="email already registered"
-        )
+        raise HTTPException(status.HTTP_409_CONFLICT, detail="email already registered")
     user = User(email=body.email, hashed_password=hash_password(body.password))
     session.add(user)
     await session.commit()
@@ -40,9 +38,7 @@ async def login(
         or not verify_password(body.password, user.hashed_password)
         or not user.is_active
     ):
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED, detail="invalid credentials"
-        )
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="invalid credentials")
     return TokenResponse(access_token=create_access_token(user.id, user.role.value))
 
 

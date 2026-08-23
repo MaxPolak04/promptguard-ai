@@ -43,7 +43,10 @@ async def chat(
     prompt_match = scan_text(body.prompt)
     if prompt_match is not None:
         await _audit(
-            session, user, AuditAction.blocked_prompt, body.prompt,
+            session,
+            user,
+            AuditAction.blocked_prompt,
+            body.prompt,
             rule=prompt_match.rule,
         )
         raise HTTPException(
@@ -65,8 +68,12 @@ async def chat(
     response_match = scan_text(reply)
     if response_match is not None:
         await _audit(
-            session, user, AuditAction.blocked_response, body.prompt,
-            response=reply, rule=response_match.rule,
+            session,
+            user,
+            AuditAction.blocked_response,
+            body.prompt,
+            response=reply,
+            rule=response_match.rule,
         )
         return ChatResponse(
             response=f"[response blocked by PromptGuard: {response_match.rule}]",

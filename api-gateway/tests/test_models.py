@@ -49,9 +49,7 @@ async def test_user_defaults(session: AsyncSession):
     session.add(user)
     await session.commit()
 
-    result = await session.execute(
-        select(User).where(User.email == "bob@example.com")
-    )
+    result = await session.execute(select(User).where(User.email == "bob@example.com"))
     fetched = result.scalar_one()
     assert fetched.role == UserRole.chat_user
     assert fetched.is_active is True

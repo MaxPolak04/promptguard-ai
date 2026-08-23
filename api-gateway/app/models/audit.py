@@ -21,9 +21,7 @@ class AuditEvent(Base):
 
     __tablename__ = "audit_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     action: Mapped[AuditAction] = mapped_column(Enum(AuditAction))
     rule: Mapped[str | None] = mapped_column(String(64), default=None)

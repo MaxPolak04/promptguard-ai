@@ -50,9 +50,7 @@ async def test_chat_rejects_empty_prompt(app, client, auth_headers):
 
 
 async def test_chat_returns_llm_reply_and_audits(app, client, auth_headers):
-    resp = await client.post(
-        "/chat", json={"prompt": "hello"}, headers=auth_headers
-    )
+    resp = await client.post("/chat", json={"prompt": "hello"}, headers=auth_headers)
     assert resp.status_code == 200
     assert resp.json() == {"response": "mock reply", "blocked": False}
     events = await _audit_events(app)
@@ -81,15 +79,15 @@ async def test_chat_blocks_leaky_response(app, client, auth_headers):
             200,
             json={
                 "choices": [
-                    {"message": {"content": "sure: AKIAIOSFODNN7EXAMPLE"}}  # pragma: allowlist secret
+                    {
+                        "message": {"content": "sure: AKIAIOSFODNN7EXAMPLE"}
+                    }  # pragma: allowlist secret
                 ]
             },
         )
 
     _override_llm(app, leaky)
-    resp = await client.post(
-        "/chat", json={"prompt": "hello"}, headers=auth_headers
-    )
+    resp = await client.post("/chat", json={"prompt": "hello"}, headers=auth_headers)
     assert resp.status_code == 200
     data = resp.json()
     assert data["blocked"] is True
@@ -98,7 +96,9 @@ async def test_chat_blocks_leaky_response(app, client, auth_headers):
     assert len(events) == 1
     assert events[0].action == AuditAction.blocked_response
     assert events[0].rule == "aws_access_key"
-    assert events[0].response == "sure: AKIAIOSFODNN7EXAMPLE"  # pragma: allowlist secret
+    assert (
+        events[0].response == "sure: AKIAIOSFODNN7EXAMPLE"
+    )  # pragma: allowlist secret
 
 
 async def test_chat_returns_502_when_provider_down(app, client, auth_headers):
@@ -106,9 +106,7 @@ async def test_chat_returns_502_when_provider_down(app, client, auth_headers):
         return httpx.Response(500, json={"error": "boom"})
 
     _override_llm(app, down)
-    resp = await client.post(
-        "/chat", json={"prompt": "hello"}, headers=auth_headers
-    )
+    resp = await client.post("/chat", json={"prompt": "hello"}, headers=auth_headers)
     assert resp.status_code == 502
     events = await _audit_events(app)
     assert len(events) == 1
@@ -122,14 +120,10 @@ async def test_chat_returns_502_when_provider_sends_null_content(
     app, client, auth_headers
 ):
     def null_content(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200, json={"choices": [{"message": {"content": None}}]}
-        )
+        return httpx.Response(200, json={"choices": [{"message": {"content": None}}]})
 
     _override_llm(app, null_content)
-    resp = await client.post(
-        "/chat", json={"prompt": "hello"}, headers=auth_headers
-    )
+    resp = await client.post("/chat", json={"prompt": "hello"}, headers=auth_headers)
     assert resp.status_code == 502
     events = await _audit_events(app)
     assert len(events) == 1
