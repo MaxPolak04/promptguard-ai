@@ -98,6 +98,7 @@ async def test_chat_blocks_leaky_response(app, client, auth_headers):
     data = resp.json()
     assert data["blocked"] is True
     assert "AKIA" not in data["response"]
+    assert "aws_access_key" not in resp.text
     events = await _audit_events(app)
     assert len(events) == 1
     assert events[0].action == AuditAction.blocked_response

@@ -75,7 +75,7 @@ async def chat(
             rule=response_match.rule,
         )
         return ChatResponse(
-            response=f"[response blocked by PromptGuard: {response_match.rule}]",
+            response="[response blocked by PromptGuard: content policy]",
             blocked=True,
         )
 
