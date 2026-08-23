@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import get_settings
 from app.db import build_engine, build_sessionmaker
+from app.llm import LLMClient
 from app.models import Base
 from app.routers import auth, health
 
@@ -22,10 +23,19 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     app.state.engine = engine
     app.state.sessionmaker = build_sessionmaker(engine)
+    app.state.llm_client = LLMClient(
+        api_base=settings.llm_api_base,
+        api_key=settings.openai_api_key,
+        model=settings.llm_model,
+        timeout_seconds=settings.llm_timeout_seconds,
+    )
     try:
         yield
     finally:
-        await engine.dispose()
+        try:
+            await app.state.llm_client.aclose()
+        finally:
+            await engine.dispose()
 
 
 async def validation_error_handler(

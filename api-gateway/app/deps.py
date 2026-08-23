@@ -1,11 +1,12 @@
 import uuid
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
+from app.llm import LLMClient
 from app.models import User
 from app.security import decode_access_token
 
@@ -41,3 +42,8 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise unauthorized
     return user
+
+
+def get_llm_client(request: Request) -> LLMClient:
+    """Return the shared LLM client created in the lifespan."""
+    return request.app.state.llm_client

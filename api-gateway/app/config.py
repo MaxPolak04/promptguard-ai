@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
+    llm_api_base: str = "https://api.openai.com/v1"
+    openai_api_key: str = ""
+    llm_model: str = "gpt-4o-mini"
+    llm_timeout_seconds: float = 30.0
+
     @property
     def database_url(self) -> str:
         """Async SQLAlchemy connection URL (asyncpg driver)."""

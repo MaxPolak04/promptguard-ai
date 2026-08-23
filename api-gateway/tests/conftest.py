@@ -1,8 +1,10 @@
+import httpx
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from app.llm import LLMClient
 from app.main import create_app
 from app.models import Base
 
@@ -20,6 +22,19 @@ async def app():
     application = create_app()
     application.state.engine = engine
     application.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+
+    def _llm_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": "mock reply"}}]}
+        )
+
+    application.state.llm_client = LLMClient(
+        api_base="https://llm.test/v1",
+        api_key="test-key",
+        model="test-model",
+        transport=httpx.MockTransport(_llm_handler),
+    )
+
     yield application
     await engine.dispose()
 
