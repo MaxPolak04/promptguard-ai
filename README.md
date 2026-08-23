@@ -28,9 +28,21 @@ You do not need a local k8s cluster for development. We use Docker.
 
 1. Copy the environment variables file:
    `cp .env.example .env` (and fill in the keys)
+   - `PROXY_SECRET_KEY` is required and must be at least 32 characters — it
+     signs every JWT the gateway issues. Generate one with:
+     `openssl rand -hex 32`
 2. Run the entire environment with:
    `docker compose up --build`
 3. Applications will be available on their respective ports (details in the terminal).
+
+## API Gateway Endpoints
+* `POST /auth/register` — create an account (email, password).
+* `POST /auth/login` — exchange credentials for a JWT access token.
+* `GET /auth/me` — return the authenticated user's own account.
+* `POST /chat` — proxy a prompt to the LLM provider; blocks and audits any
+  request or reply containing a detected credential or PESEL.
+* `GET /health` — liveness check.
+* `GET /health/db` — database connectivity check.
 
 ## How to Contribute
 Please read the [CONTRIBUTING.md](.github/CONTRIBUTING.md) file before writing your first line of code!
