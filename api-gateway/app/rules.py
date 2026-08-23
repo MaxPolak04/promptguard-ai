@@ -1,19 +1,28 @@
 import re
 from dataclasses import dataclass
 
-# No leading anchor: an attacker can defeat a `\b`- or alnum-lookbehind-based
-# anchor simply by gluing one more letter or digit onto the front of the key,
-# and evading detection is this product's threat model. A trailing `\b` is
-# kept so the match doesn't run on into unrelated following characters.
+# No word-boundary anchors on either edge of the credential prefixes: an
+# attacker can defeat a `\b`- or alnum-lookbehind-based anchor simply by
+# gluing one more character onto either end of the key, and evading
+# detection is this product's threat model. `scan_text` only uses
+# `search()` for truthiness, so an anchor buys nothing about match extent
+# while costing that evasion (a key immediately followed by one more
+# letter or digit was previously missed by a trailing `\b` alone).
 _PATTERNS: dict[str, re.Pattern[str]] = {
-    "aws_access_key": re.compile(r"AKIA[0-9A-Z]{16}\b", re.IGNORECASE),
-    "openai_api_key": re.compile(r"sk-[A-Za-z0-9_-]{20,}\b", re.IGNORECASE),
+    "aws_access_key": re.compile(r"AKIA[0-9A-Z]{16}", re.IGNORECASE),
+    # The final run must be pure alphanumeric (no '-'): ordinary hyphenated
+    # words ("risk-assessment-plan") never contain a 20+ character unbroken
+    # alnum run, but a real key's body does. `[A-Za-z0-9_-]*` absorbs any
+    # `proj-`-style infix (e.g. "sk-proj-...") ahead of that run.
+    "openai_api_key": re.compile(r"sk-[A-Za-z0-9_-]*[A-Za-z0-9]{20,}", re.IGNORECASE),
     "private_key_block": re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
 }
 
-# Tolerates a single '-' or ' ' separator (e.g. "440514-01359"); the exact
-# digit count is enforced after stripping, in _is_valid_pesel's caller.
-_PESEL_CANDIDATE = re.compile(r"\b\d{11}\b|\b\d{1,10}[-\s]\d{1,10}\b")
+# Tolerates a single '-' or ' ' separator (e.g. "440514-01359"). The class is
+# deliberately just "- " (not \s) to match what the stripping below removes;
+# a tab- or newline-joined candidate is meant to fail the length check, not
+# to be silently accepted by a wider match and then discarded anyway.
+_PESEL_CANDIDATE = re.compile(r"\b\d{11}\b|\b\d{1,10}[- ]\d{1,10}\b")
 _PESEL_WEIGHTS = (1, 3, 7, 9, 1, 3, 7, 9, 1, 3)
 
 

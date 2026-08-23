@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from app.config import Settings
 
-_VALID_SECRET = "test-secret-key-not-for-production-use"
+_VALID_SECRET = "test-secret-key-not-for-production-use"  # pragma: allowlist secret
 
 
 def test_database_url_assembled_from_components():
@@ -35,5 +35,5 @@ def test_short_proxy_secret_key_is_rejected():
             postgres_user="u",
             postgres_password="p",
             postgres_db="d",
-            proxy_secret_key="short",
+            proxy_secret_key="short",  # pragma: allowlist secret
         )
