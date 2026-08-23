@@ -54,8 +54,9 @@ async def chat(
     try:
         reply = await llm.complete(body.prompt)
     except LLMError as exc:
-        # The prompt already left the organization, so it still gets an
-        # audit row even though the provider could not be reached.
+        # The prompt may already have reached the provider (e.g. a malformed
+        # reply, as opposed to a connect/DNS failure), so it still gets an
+        # audit row even though no usable response came back.
         await _audit(session, user, AuditAction.allowed, body.prompt)
         raise HTTPException(
             status.HTTP_502_BAD_GATEWAY, detail="LLM provider unavailable"

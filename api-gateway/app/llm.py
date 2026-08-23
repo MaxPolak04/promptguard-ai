@@ -39,9 +39,12 @@ class LLMClient:
             raise LLMError(str(exc)) from exc
         try:
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            content = data["choices"][0]["message"]["content"]
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise LLMError("malformed provider response") from exc
+        if not isinstance(content, str):
+            raise LLMError("malformed provider response")
+        return content
 
     async def aclose(self) -> None:
         """Release the underlying HTTP connection pool."""

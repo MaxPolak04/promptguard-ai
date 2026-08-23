@@ -35,9 +35,18 @@ def _override_llm(app, handler):
     )
 
 
-async def test_chat_requires_auth(client):
+async def test_chat_requires_auth(app, client):
     resp = await client.post("/chat", json={"prompt": "hello"})
     assert resp.status_code == 401
+    events = await _audit_events(app)
+    assert len(events) == 0
+
+
+async def test_chat_rejects_empty_prompt(app, client, auth_headers):
+    resp = await client.post("/chat", json={"prompt": ""}, headers=auth_headers)
+    assert resp.status_code == 422
+    events = await _audit_events(app)
+    assert len(events) == 0
 
 
 async def test_chat_returns_llm_reply_and_audits(app, client, auth_headers):
@@ -89,6 +98,7 @@ async def test_chat_blocks_leaky_response(app, client, auth_headers):
     assert len(events) == 1
     assert events[0].action == AuditAction.blocked_response
     assert events[0].rule == "aws_access_key"
+    assert events[0].response == "sure: AKIAIOSFODNN7EXAMPLE"  # pragma: allowlist secret
 
 
 async def test_chat_returns_502_when_provider_down(app, client, auth_headers):
@@ -96,6 +106,27 @@ async def test_chat_returns_502_when_provider_down(app, client, auth_headers):
         return httpx.Response(500, json={"error": "boom"})
 
     _override_llm(app, down)
+    resp = await client.post(
+        "/chat", json={"prompt": "hello"}, headers=auth_headers
+    )
+    assert resp.status_code == 502
+    events = await _audit_events(app)
+    assert len(events) == 1
+    assert events[0].action == AuditAction.allowed
+    assert events[0].prompt == "hello"
+    assert events[0].response is None
+    assert events[0].rule is None
+
+
+async def test_chat_returns_502_when_provider_sends_null_content(
+    app, client, auth_headers
+):
+    def null_content(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": None}}]}
+        )
+
+    _override_llm(app, null_content)
     resp = await client.post(
         "/chat", json={"prompt": "hello"}, headers=auth_headers
     )

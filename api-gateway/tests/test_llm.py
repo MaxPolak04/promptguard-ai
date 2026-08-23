@@ -64,3 +64,13 @@ async def test_non_json_body_raises_llm_error():
     with pytest.raises(LLMError):
         await client.complete("hello")
     await client.aclose()
+
+
+async def test_null_content_raises_llm_error():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": [{"message": {"content": None}}]})
+
+    client = _client(handler)
+    with pytest.raises(LLMError):
+        await client.complete("hello")
+    await client.aclose()
