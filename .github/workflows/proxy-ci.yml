@@ -37,14 +37,15 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: './api-gateway/requirements.txt'
+          cache-dependency-path: |
+            ./api-gateway/requirements.txt
+            ./api-gateway/requirements-dev.txt
 
       - name: Step 1 - Installing Dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Step 2 - Code Quality (Linters and Formatters)
         run: |
-          pip install ruff
           ruff check app/ tests/
           ruff format --check app/ tests/
 
